@@ -15,13 +15,13 @@ __Requirements__
 
 __Running the notebook__  
 
-To run the `Flood_Demo.ipynb` or `AirQuality_demo.ipynb` notebook, run the following commands that create a conda environment called `ideas_notebook` using the `environment.yml` file to include all required dependencies, and install the environment as a kernelspec:
+To run the `AirQuality_demo.ipynb` notebook, run the following commands that create a conda environment called `firealarm_notebook` using the `environment.yml` file to include all required dependencies, and install the environment as a kernelspec:
 ```
 conda env create -f environment.yml
-conda activate ideas_notebook
+conda activate firealarm_notebook
 pip install notebook
 pip install ipykernel
-python -m ipykernel install --user --name=ideas_notebook
+python -m ipykernel install --user --name=firealarm_notebook
 jupyter notebook
 ```
 From the localhost page that opens, you can run the ideas notebook. Make sure you change the kernel by selecting the option at the top Kernel -> Change kernel -> ideas_notebook (see [here](https://ipython.readthedocs.io/en/stable/install/kernel_install.html#kernels-for-different-environments) for more information).
