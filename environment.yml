@@ -1,5 +1,5 @@
 # conda env create -f environment.yml
-name: ideas_notebook
+name: firealarm_notebook
 channels:
   - conda-forge
 dependencies:
