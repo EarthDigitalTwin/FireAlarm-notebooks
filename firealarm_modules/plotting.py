@@ -33,7 +33,7 @@ def timeseries_plot(data: List[Tuple[xr.DataArray, str]], x_label: str, y_label:
             plt.plot(da.time, vals, linewidth=2,
                      label=textwrap.fill(label, 50))
 
-    plt.grid(b=True, which='major', color='k', linestyle='-')
+    plt.grid(visible=True, which='major', color='k', linestyle='-')
     plt.xlabel(x_label, fontsize=12)
     plt.ylabel(y_label, fontsize=12)
     plt.gcf().autofmt_xdate()
@@ -57,7 +57,7 @@ def plot_insitu(data: List[Tuple[pd.DataFrame, str, str]], title: str, ylabel='m
             ylabel = 'Normalized values'
         plt.plot(df.time, var_data, label=label)
 
-    plt.grid(b=True, which='major', color='k', linestyle='-')
+    plt.grid(visible=True, which='major', color='k', linestyle='-')
     plt.ylabel(ylabel, fontsize=12)
     plt.gcf().autofmt_xdate()
     plt.xticks(rotation=45)
