@@ -39,9 +39,28 @@ def timeseries_plot(data: List[Tuple[xr.DataArray, str]], x_label: str, y_label:
     plt.gcf().autofmt_xdate()
     plt.xticks(rotation=45)
     plt.title(title, fontsize=16)
-    plt.legend(prop={'size': 12})
+    plt.legend(prop={'size': 10})
     plt.show()
 
+
+def timeseries_multi_plot(data: List[Tuple[xr.DataArray, str, str]]):
+    
+    fig, axs = plt.subplots(int(np.ceil(len(data)/2)), 2,  figsize=(10,8))
+    # fig.autofmt_xdate()
+    # fig.xtic
+    for (da, title, ylabel), ax in zip(data, axs.flatten()):
+        ax.grid(visible=True, which='major', color='k', linestyle='-')
+        ax.plot(da.time, da.values)
+        ax.set_ylabel(ylabel, fontsize=12)
+        for xlabel in ax.get_xticklabels():
+            xlabel.set_ha("right")
+            xlabel.set_rotation(30)
+        ax.set_title(title, fontsize=14)
+        # ax.legend(prop={'size': 12})
+    if len(data)%2:
+        axs.flatten()[-1].set_visible(False)
+    fig.tight_layout()
+    plt.show()  
 
 def timeseries_bands_plot(da, var_label, x_label, y_label, title):
     plt.figure(figsize=(12, 5))
@@ -53,7 +72,7 @@ def timeseries_bands_plot(da, var_label, x_label, y_label, title):
     plt.xlabel(x_label, fontsize=12)
     plt.ylabel(y_label, fontsize=12)
     plt.gcf().autofmt_xdate()
-    plt.gcf().xaxis.set_major_formatter(mdates.ConciseDateFormatter(ax.xaxis.get_major_locator()))
+    # plt.gca().xaxis.set_major_formatter(dates.ConciseDateFormatter(plt.gca().xaxis.get_major_locator()))
     plt.xticks(rotation=45)
     plt.title(title, fontsize=16)
     plt.legend(prop={'size': 12})
@@ -76,6 +95,7 @@ def plot_insitu(data: List[Tuple[pd.DataFrame, str, str]], title: str, ylabel='m
 
     plt.grid(visible=True, which='major', color='k', linestyle='-')
     plt.ylabel(ylabel, fontsize=12)
+    plt.gca().xaxis.set_major_formatter(dates.DateFormatter('%b - %d'))
     plt.gcf().autofmt_xdate()
     plt.xticks(rotation=45)
     plt.title(title, fontsize=16)
@@ -121,7 +141,7 @@ def base_map(bounds: dict = {}, padding: float = 2.5) -> plt.axes:
     return ax
 
 
-def map_box(bb: dict, padding=20):
+def map_box(bb: dict, points: List= [], padding=20):
     '''
     Adds bounding box to map
     '''
@@ -129,10 +149,13 @@ def map_box(bb: dict, padding=20):
     poly = Polygon([(bb['min_lon'], bb['min_lat']), (bb['min_lon'], bb['max_lat']), (bb['max_lon'], bb['max_lat']), (bb['max_lon'], bb['min_lat'])],
                    facecolor=(0, 0, 0, 0.0), edgecolor='red', linewidth=2, zorder=200)
     ax.add_patch(poly)
+    for (lat, lon, label) in points:
+        ax.scatter([lon], [lat], s=50, alpha=1, label=label, c='red')
+    plt.legend()
     plt.show()
 
 
-def map_points(points: List, region='miss', title='', zoom=False):
+def map_points(points: List, region='', title='', zoom=False):
     '''
     Plots lat lon points on map
     points: list of tuples (lat, lon, label)
@@ -158,6 +181,9 @@ def map_points(points: List, region='miss', title='', zoom=False):
         if zoom:
             ax.set_xlim(-0.5, 1)
             ax.set_ylim(44, 45)
+    elif region == 'la':
+        ax.set_xlim(-120, -117)
+        ax.set_ylim(32, 35)
 
     ax.legend().set_zorder(102)
 

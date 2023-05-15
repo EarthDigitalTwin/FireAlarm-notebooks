@@ -34,7 +34,7 @@ def spatial_timeseries(base_url: str, dataset: str, bb: dict, start_time: dateti
                start_time.strftime(dt_format), end_time.strftime(dt_format))
 
     # Display some information about the job
-    print('url\n', url)
+    print(url)
     print()
 
     # Query FireAlarm to compute the time averaged map
@@ -83,7 +83,7 @@ def data_subsetting(base_url: str, dataset: str, bb: dict, start_time: datetime,
         base_url, dataset, bb['min_lon'], bb['min_lat'], bb['max_lon'], bb['max_lat'],
         start_time.strftime(dt_format), end_time.strftime(dt_format))
 
-    print('url\n', url)
+    print(url)
     print()
 
     print("Waiting for response from FireAlarm...", end="")
@@ -101,7 +101,7 @@ def max_min_map_spark(base_url: str, dataset: str, bb: dict, start_time: datetim
           f'b={bb["min_lon"]},{bb["min_lat"]},{bb["max_lon"]},{bb["max_lat"]}&' \
           f'startTime={start_time.strftime(dt_format)}&endTime={end_time.strftime(dt_format)}'
 
-    print('url\n', url)
+    print(url)
     print()
 
     print("Waiting for response from FireAlarm... ", end="")
@@ -120,7 +120,7 @@ def daily_diff(base_url: str, dataset: str, clim: str, bb: dict, start_time: dat
           f'b={bb["min_lon"]},{bb["min_lat"]},{bb["max_lon"]},{bb["max_lat"]}&' \
           f'startTime={start_time.strftime(dt_format)}&endTime={end_time.strftime(dt_format)}'
 
-    print('url\n', url)
+    print(url)
     print()
 
     print("Waiting for response from FireAlarm... ", end="")
@@ -138,7 +138,7 @@ def temporal_mean(base_url: str, dataset: str, bb: dict, start_time: datetime, e
           f'b={bb["min_lon"]},{bb["min_lat"]},{bb["max_lon"]},{bb["max_lat"]}&' \
           f'startTime={start_time.strftime(dt_format)}&endTime={end_time.strftime(dt_format)}'
 
-    print('url\n', url)
+    print(url)
     print()
 
     print("Waiting for response from FireAlarm... ", end="")
@@ -156,7 +156,7 @@ def hofmoeller(base_url: str, dataset: str, bb: dict, start_time: datetime, end_
           f'b={bb["min_lon"]},{bb["min_lat"]},{bb["max_lon"]},{bb["max_lat"]}&' \
           f'startTime={start_time.strftime(dt_format)}&endTime={end_time.strftime(dt_format)}'
 
-    print('url\n', url)
+    print(url)
     print()
 
     print("Waiting for response from FireAlarm... ", end="")
@@ -246,11 +246,11 @@ def prep_data_in_bounds(var_json: dict) -> xr.DataArray:
     '''
     lats = np.unique([o['latitude'] for o in var_json])
     lons = np.unique([o['longitude'] for o in var_json])
-    times = np.unique([o['time'] for o in var_json])
+    times = np.unique([datetime.fromtimestamp(o['time']) for o in var_json])
 
     vals_3d = np.full((len(times), len(lats), len(lons)), np.nan)
 
-    data_dict = {(data['time'], data['latitude'], data['longitude']): data['data'][0]['variable'] for data in var_json}
+    data_dict = {(datetime.fromtimestamp(data['time']), data['latitude'], data['longitude']): data['data'][0]['variable'] for data in var_json}
 
     for i, t in enumerate(times):
         for j, lat in enumerate(lats):
