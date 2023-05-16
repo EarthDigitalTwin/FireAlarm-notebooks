@@ -184,6 +184,12 @@ def map_points(points: List, region='', title='', zoom=False):
     elif region == 'la':
         ax.set_xlim(-120, -117)
         ax.set_ylim(32, 35)
+    elif region == 'alberta':
+        ax.set_xlim(-130, -110)
+        ax.set_ylim(40, 65)
+    elif region == 'norcal':
+        ax.set_xlim(-127.5, -115)
+        ax.set_ylim(35, 45)
 
     ax.legend().set_zorder(102)
 
