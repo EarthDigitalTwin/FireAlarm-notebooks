@@ -79,7 +79,7 @@ def timeseries_bands_plot(da, var_label, x_label, y_label, title):
     plt.show()
 
 
-def plot_insitu(data: List[Tuple[pd.DataFrame, str, str]], title: str, ylabel='m3/s', norm=False):
+def plot_insitu(data: List[Tuple[pd.DataFrame, str, str]], title: str, ylabel='m3/s', norm=False, shared_year=False):
     fig = plt.figure(figsize=(12, 5))
 
     for df, var, label in data:
@@ -95,7 +95,9 @@ def plot_insitu(data: List[Tuple[pd.DataFrame, str, str]], title: str, ylabel='m
 
     plt.grid(visible=True, which='major', color='k', linestyle='-')
     plt.ylabel(ylabel, fontsize=12)
-    plt.gca().xaxis.set_major_formatter(dates.DateFormatter('%b - %d'))
+    if shared_year:
+        plt.gca().xaxis.set_major_formatter(dates.DateFormatter('%b %d'))
+        
     plt.gcf().autofmt_xdate()
     plt.xticks(rotation=45)
     plt.title(title, fontsize=16)
@@ -122,13 +124,10 @@ def base_map(bounds: dict = {}, padding: float = 2.5) -> plt.axes:
     ax.add_feature(cf.OCEAN)
     ax.coastlines('10m')
     ax.add_feature(cf.STATES, zorder=100)
-
-    countries = cf.NaturalEarthFeature(
-        category='cultural', name='admin_0_countries', scale='10m', facecolor='none')
-    rivers = cf.NaturalEarthFeature(
-        category='physical', name='rivers_lake_centerlines', scale='10m', facecolor='none', edgecolor='blue')
-    ax.add_feature(countries, zorder=100)
-    ax.add_feature(rivers, zorder=101)
+    roads = cf.NaturalEarthFeature(category='cultural', 
+        name='roads',
+        scale='10m',facecolor='none')
+    ax.add_feature(roads, alpha=.5)
 
     gl = ax.gridlines(crs=ccrs.PlateCarree(), linewidth=1, color='black',
                       alpha=0.25, linestyle='--', draw_labels=True, zorder=90)
@@ -150,8 +149,9 @@ def map_box(bb: dict, points: List= [], padding=20):
                    facecolor=(0, 0, 0, 0.0), edgecolor='red', linewidth=2, zorder=200)
     ax.add_patch(poly)
     for (lat, lon, label) in points:
-        ax.scatter([lon], [lat], s=50, alpha=1, label=label, c='red')
-    plt.legend()
+        ax.scatter([lon], [lat], s=50, alpha=1, label=label)
+    if points:
+        plt.legend()
     plt.show()
 
 

@@ -246,11 +246,11 @@ def prep_data_in_bounds(var_json: dict) -> xr.DataArray:
     '''
     lats = np.unique([o['latitude'] for o in var_json])
     lons = np.unique([o['longitude'] for o in var_json])
-    times = np.unique([datetime.fromtimestamp(o['time']) for o in var_json])
+    times = np.unique([datetime.utcfromtimestamp(o['time']) for o in var_json])
 
     vals_3d = np.full((len(times), len(lats), len(lons)), np.nan)
 
-    data_dict = {(datetime.fromtimestamp(data['time']), data['latitude'], data['longitude']): data['data'][0]['variable'] for data in var_json}
+    data_dict = {(datetime.utcfromtimestamp(data['time']), data['latitude'], data['longitude']): data['data'][0]['variable'] for data in var_json}
 
     for i, t in enumerate(times):
         for j, lat in enumerate(lats):
@@ -275,10 +275,14 @@ def max_min_prep(var_json: dict) -> xr.Dataset:
     Formats maxmin response into xarray dataset object
     '''
     shortname = var_json['meta']['shortName']
-    maxima = np.array([v['maxima'] for var in var_json['data'] for v in var])
+    maxima = np.array([v['maxima'] for var in var_json['data'] for v in var if v['maxima']])
     minima = np.array([v['minima'] for var in var_json['data'] for v in var])
     lat = np.array([var[0]['lat'] for var in var_json['data']])
     lon = np.array([v['lon'] for v in var_json['data'][0]])
+    
+    maxima = np.where(maxima==-9999.0, np.nan, maxima)
+    minima = np.where(minima==-9999.0, np.nan, minima)
+    
 
     maxima_2d = np.reshape(maxima, (len(var_json['data']), len(var_json['data'][0])))
     minima_2d = np.reshape(minima, (len(var_json['data']), len(var_json['data'][0])))
