@@ -184,6 +184,22 @@ def insitu(base_url: str, provider: str, project: str, bb: str, start_time: date
     return prep_insitu(results)
 
 
+def get_datasets(base_url: str) -> pd.DataFrame:
+    r = requests.get(f'{base_url}/edge/ws/dat/dataset?inDAT=true&itemsPerPage=100')
+    aq_datasets = pd.DataFrame([ds for ds in r.json()['Datasets'] if 'air quality' in ds['Keyword']])
+    return aq_datasets
+
+def get_insitu_sites(insitu_url: str) -> pd.DataFrame:
+    r = requests.get(f'{insitu_url}/sub_collection_statistics')
+    all_sites = []
+    for provider in r.json()['providers']:
+        provider_name = provider['provider']
+        sites = [proj['sites'] for proj in provider['projects'] if proj['project'] == 'AQACF'][0]
+        for site in sites:
+            site['provider'] = provider_name
+        all_sites.extend(sites)
+    return pd.DataFrame(all_sites)[['provider', 'site', 'lat', 'lon']]
+
 '''
 FireAlarm endpoint response processing
 '''

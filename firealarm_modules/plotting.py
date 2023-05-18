@@ -192,6 +192,9 @@ def map_points(points: List, region='', title='', zoom=False):
     elif region == 'norcal':
         ax.set_xlim(-127.5, -115)
         ax.set_ylim(35, 45)
+    elif region == 'westcoast':
+        ax.set_xlim(-130, -100)
+        ax.set_ylim(30, 60)
 
     ax.legend().set_zorder(102)
 
