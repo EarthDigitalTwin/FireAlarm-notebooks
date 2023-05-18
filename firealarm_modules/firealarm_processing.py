@@ -1,3 +1,4 @@
+from collections import defaultdict
 from datetime import datetime
 from typing import List
 import numpy as np
@@ -12,6 +13,17 @@ dt_format = "%Y-%m-%dT%H:%M:%SZ"
 FireAlarm endpoint functions
 '''
 
+def firealarm_request(url):
+    try:
+        r = requests.get(url, verify=False)
+        r.raise_for_status()
+    except:
+        raise Exception(f'Error processing request. Check parameters.')
+    results = r.json()
+    if 'data' in results:
+        return results
+    else:
+        raise Exception('No data found for request.')
 
 def spatial_timeseries(base_url: str, dataset: str, bb: dict, start_time: datetime, end_time: datetime) -> xr.Dataset:
     '''
@@ -22,13 +34,13 @@ def spatial_timeseries(base_url: str, dataset: str, bb: dict, start_time: dateti
                start_time.strftime(dt_format), end_time.strftime(dt_format))
 
     # Display some information about the job
-    print('url\n', url)
+    print(url)
     print()
 
     # Query FireAlarm to compute the time averaged map
     print("Waiting for response from FireAlarm...", end="")
     start = time.perf_counter()
-    ts_json = requests.get(url, verify=False).json()
+    ts_json = firealarm_request(url)
     print("took {} seconds".format(time.perf_counter() - start))
     return prep_ts(ts_json)
 
@@ -71,7 +83,7 @@ def data_subsetting(base_url: str, dataset: str, bb: dict, start_time: datetime,
         base_url, dataset, bb['min_lon'], bb['min_lat'], bb['max_lon'], bb['max_lat'],
         start_time.strftime(dt_format), end_time.strftime(dt_format))
 
-    print('url\n', url)
+    print(url)
     print()
 
     print("Waiting for response from FireAlarm...", end="")
@@ -89,7 +101,7 @@ def max_min_map_spark(base_url: str, dataset: str, bb: dict, start_time: datetim
           f'b={bb["min_lon"]},{bb["min_lat"]},{bb["max_lon"]},{bb["max_lat"]}&' \
           f'startTime={start_time.strftime(dt_format)}&endTime={end_time.strftime(dt_format)}'
 
-    print('url\n', url)
+    print(url)
     print()
 
     print("Waiting for response from FireAlarm... ", end="")
@@ -108,7 +120,7 @@ def daily_diff(base_url: str, dataset: str, clim: str, bb: dict, start_time: dat
           f'b={bb["min_lon"]},{bb["min_lat"]},{bb["max_lon"]},{bb["max_lat"]}&' \
           f'startTime={start_time.strftime(dt_format)}&endTime={end_time.strftime(dt_format)}'
 
-    print('url\n', url)
+    print(url)
     print()
 
     print("Waiting for response from FireAlarm... ", end="")
@@ -126,7 +138,7 @@ def temporal_mean(base_url: str, dataset: str, bb: dict, start_time: datetime, e
           f'b={bb["min_lon"]},{bb["min_lat"]},{bb["max_lon"]},{bb["max_lat"]}&' \
           f'startTime={start_time.strftime(dt_format)}&endTime={end_time.strftime(dt_format)}'
 
-    print('url\n', url)
+    print(url)
     print()
 
     print("Waiting for response from FireAlarm... ", end="")
@@ -144,7 +156,7 @@ def hofmoeller(base_url: str, dataset: str, bb: dict, start_time: datetime, end_
           f'b={bb["min_lon"]},{bb["min_lat"]},{bb["max_lon"]},{bb["max_lat"]}&' \
           f'startTime={start_time.strftime(dt_format)}&endTime={end_time.strftime(dt_format)}'
 
-    print('url\n', url)
+    print(url)
     print()
 
     print("Waiting for response from FireAlarm... ", end="")
@@ -154,12 +166,12 @@ def hofmoeller(base_url: str, dataset: str, bb: dict, start_time: datetime, end_
     return hofmoeller_prep(resp, dim)
 
 
-def insitu(base_url: str, provider: str, project: str, bb: str, start_time: datetime, end_time: datetime, var: str) -> pd.DataFrame:
+def insitu(base_url: str, provider: str, project: str, bb: str, start_time: datetime, end_time: datetime) -> pd.DataFrame:
     results = []
     base_url = base_url.replace('/nexus', '')
     next_url = f'{base_url}/insitu/1.0/query_data_doms_custom_pagination?startIndex=0&itemsPerPage=10000&' \
         f'provider={provider}&project={project}&startTime={datetime.strftime(start_time, "%Y-%m-%dT%H:%M:%SZ")}&' \
-        f'endTime={datetime.strftime(end_time, "%Y-%m-%dT%H:%M:%SZ")}&bbox={bb}&variable={var}'
+        f'endTime={datetime.strftime(end_time, "%Y-%m-%dT%H:%M:%SZ")}&bbox={bb}'
 
     while next_url:
         print(next_url)
@@ -183,6 +195,8 @@ def prep_insitu(results: List) -> pd.DataFrame:
         if 'results' in r.keys():
             all_results.extend(r['results'])
     df = pd.DataFrame(all_results)
+    df = df.dropna(axis=1, how='all')
+    df.time = pd.to_datetime(df.time)
     return df
 
 
@@ -190,7 +204,7 @@ def prep_ts(ts_json: dict) -> xr.Dataset:
     '''
     Formats timeseriesspark response into xarray dataset object
     '''
-    time = np.array([np.datetime64(ts[0]["iso_time"][:10])
+    time = np.array([np.datetime64(ts[0]["iso_time"][:19])
                     for ts in ts_json["data"]])
     means = np.array([ts[0]["mean"] for ts in ts_json["data"]])
     mins = np.array([ts[0]["min"] for ts in ts_json["data"]])
@@ -232,11 +246,11 @@ def prep_data_in_bounds(var_json: dict) -> xr.DataArray:
     '''
     lats = np.unique([o['latitude'] for o in var_json])
     lons = np.unique([o['longitude'] for o in var_json])
-    times = np.unique([o['time'] for o in var_json])
+    times = np.unique([datetime.utcfromtimestamp(o['time']) for o in var_json])
 
-    vals_3d = np.empty((len(times), len(lats), len(lons)))
+    vals_3d = np.full((len(times), len(lats), len(lons)), np.nan)
 
-    data_dict = {(data['time'], data['latitude'], data['longitude']): data['data'][0]['variable'] for data in var_json}
+    data_dict = {(datetime.utcfromtimestamp(data['time']), data['latitude'], data['longitude']): data['data'][0]['variable'] for data in var_json}
 
     for i, t in enumerate(times):
         for j, lat in enumerate(lats):
@@ -261,15 +275,17 @@ def max_min_prep(var_json: dict) -> xr.Dataset:
     Formats maxmin response into xarray dataset object
     '''
     shortname = var_json['meta']['shortName']
-    maxima = np.array([v['maxima'] for var in var_json['data'] for v in var])
+    maxima = np.array([v['maxima'] for var in var_json['data'] for v in var if v['maxima']])
     minima = np.array([v['minima'] for var in var_json['data'] for v in var])
     lat = np.array([var[0]['lat'] for var in var_json['data']])
     lon = np.array([v['lon'] for v in var_json['data'][0]])
+    
+    maxima = np.where(maxima==-9999.0, np.nan, maxima)
+    minima = np.where(minima==-9999.0, np.nan, minima)
+    
 
-    maxima_2d = np.reshape(
-        maxima, (len(var_json['data']), len(var_json['data'][0])))
-    minima_2d = np.reshape(
-        minima, (len(var_json['data']), len(var_json['data'][0])))
+    maxima_2d = np.reshape(maxima, (len(var_json['data']), len(var_json['data'][0])))
+    minima_2d = np.reshape(minima, (len(var_json['data']), len(var_json['data'][0])))
 
     ds = xr.Dataset(
         data_vars=dict(
@@ -356,16 +372,31 @@ def hofmoeller_prep(var_json: dict, dim: str) -> xr.Dataset:
         dim_short = 'lats'
     else:
         dim_short = 'lons'
-    dims = [l[dim] for l in var_json['data'][0][dim_short]]
-    means = [l['mean'] for s in var_json['data'] for l in s[dim_short]]
-    stds = [l['std'] for s in var_json['data'] for l in s[dim_short]]
-    maxs = [l['max'] for s in var_json['data'] for l in s[dim_short]]
-    mins = [l['min'] for s in var_json['data'] for l in s[dim_short]]
+    unique_dims = sorted(list(set([l[dim] for s in var_json['data'] for l in s[dim_short]])))
+    
+    means = defaultdict(list)
+    stds = defaultdict(list)
+    maxs = defaultdict(list)
+    mins = defaultdict(list)
+    for s in var_json['data']:
+        seen_dims = []
+        for l in s[dim_short]:
+            seen_dims.append(l[dim])
+            means[l[dim]].append(l['mean'])
+            stds[l[dim]].append(l['std'])
+            maxs[l[dim]].append(l['max'])
+            mins[l[dim]].append(l['min'])
+        unseen_dims = list(set(unique_dims) - set(seen_dims))
+        for unseen_dim in unseen_dims:
+            means[unseen_dim].append(np.nan)
+            stds[unseen_dim].append(np.nan)
+            maxs[unseen_dim].append(np.nan)
+            mins[unseen_dim].append(np.nan)
 
-    mean_2d = np.reshape(means, (len(times), len(dims)))
-    std_2d = np.reshape(stds, (len(times), len(dims)))
-    max_2d = np.reshape(maxs, (len(times), len(dims)))
-    min_2d = np.reshape(mins, (len(times), len(dims)))
+    mean_2d = pd.DataFrame(means).to_numpy()
+    std_2d = pd.DataFrame(stds).to_numpy()
+    max_2d = pd.DataFrame(maxs).to_numpy()
+    min_2d = pd.DataFrame(mins).to_numpy()
 
     ds = xr.Dataset(
         data_vars=dict(
@@ -376,7 +407,7 @@ def hofmoeller_prep(var_json: dict, dim: str) -> xr.Dataset:
         ),
         coords=dict(
             time=(['time'], times),
-            dim=([dim_short[:-1]], dims)
+            dim=([dim_short[:-1]], unique_dims)
         )
     )
     return ds

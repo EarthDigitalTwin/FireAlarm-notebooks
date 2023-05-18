@@ -33,17 +33,53 @@ def timeseries_plot(data: List[Tuple[xr.DataArray, str]], x_label: str, y_label:
             plt.plot(da.time, vals, linewidth=2,
                      label=textwrap.fill(label, 50))
 
-    plt.grid(b=True, which='major', color='k', linestyle='-')
+    plt.grid(visible=True, which='major', color='k', linestyle='-')
     plt.xlabel(x_label, fontsize=12)
     plt.ylabel(y_label, fontsize=12)
     plt.gcf().autofmt_xdate()
+    plt.xticks(rotation=45)
+    plt.title(title, fontsize=16)
+    plt.legend(prop={'size': 10})
+    plt.show()
+
+
+def timeseries_multi_plot(data: List[Tuple[xr.DataArray, str, str]]):
+    
+    fig, axs = plt.subplots(int(np.ceil(len(data)/2)), 2,  figsize=(10,8))
+    # fig.autofmt_xdate()
+    # fig.xtic
+    for (da, title, ylabel), ax in zip(data, axs.flatten()):
+        ax.grid(visible=True, which='major', color='k', linestyle='-')
+        ax.plot(da.time, da.values)
+        ax.set_ylabel(ylabel, fontsize=12)
+        for xlabel in ax.get_xticklabels():
+            xlabel.set_ha("right")
+            xlabel.set_rotation(30)
+        ax.set_title(title, fontsize=14)
+        # ax.legend(prop={'size': 12})
+    if len(data)%2:
+        axs.flatten()[-1].set_visible(False)
+    fig.tight_layout()
+    plt.show()  
+
+def timeseries_bands_plot(da, var_label, x_label, y_label, title):
+    plt.figure(figsize=(12, 5))
+
+    plt.fill_between(da['time'], da['mean'] - da['std'], da['mean'] + da['std'], alpha=.25)
+    plt.plot(da['time'], da['mean'], linewidth=2, label=textwrap.fill(var_label, 50))
+
+    plt.grid(visible=True, which='major', color='k', linestyle='-')
+    plt.xlabel(x_label, fontsize=12)
+    plt.ylabel(y_label, fontsize=12)
+    plt.gcf().autofmt_xdate()
+    # plt.gca().xaxis.set_major_formatter(dates.ConciseDateFormatter(plt.gca().xaxis.get_major_locator()))
     plt.xticks(rotation=45)
     plt.title(title, fontsize=16)
     plt.legend(prop={'size': 12})
     plt.show()
 
 
-def plot_insitu(data: List[Tuple[pd.DataFrame, str, str]], title: str, ylabel='m3/s', norm=False):
+def plot_insitu(data: List[Tuple[pd.DataFrame, str, str]], title: str, ylabel='m3/s', norm=False, shared_year=False):
     fig = plt.figure(figsize=(12, 5))
 
     for df, var, label in data:
@@ -57,8 +93,11 @@ def plot_insitu(data: List[Tuple[pd.DataFrame, str, str]], title: str, ylabel='m
             ylabel = 'Normalized values'
         plt.plot(df.time, var_data, label=label)
 
-    plt.grid(b=True, which='major', color='k', linestyle='-')
+    plt.grid(visible=True, which='major', color='k', linestyle='-')
     plt.ylabel(ylabel, fontsize=12)
+    if shared_year:
+        plt.gca().xaxis.set_major_formatter(dates.DateFormatter('%b %d'))
+        
     plt.gcf().autofmt_xdate()
     plt.xticks(rotation=45)
     plt.title(title, fontsize=16)
@@ -85,13 +124,10 @@ def base_map(bounds: dict = {}, padding: float = 2.5) -> plt.axes:
     ax.add_feature(cf.OCEAN)
     ax.coastlines('10m')
     ax.add_feature(cf.STATES, zorder=100)
-
-    countries = cf.NaturalEarthFeature(
-        category='cultural', name='admin_0_countries', scale='10m', facecolor='none')
-    rivers = cf.NaturalEarthFeature(
-        category='physical', name='rivers_lake_centerlines', scale='10m', facecolor='none', edgecolor='blue')
-    ax.add_feature(countries, zorder=100)
-    ax.add_feature(rivers, zorder=101)
+    roads = cf.NaturalEarthFeature(category='cultural', 
+        name='roads',
+        scale='10m',facecolor='none')
+    ax.add_feature(roads, alpha=.5)
 
     gl = ax.gridlines(crs=ccrs.PlateCarree(), linewidth=1, color='black',
                       alpha=0.25, linestyle='--', draw_labels=True, zorder=90)
@@ -104,7 +140,7 @@ def base_map(bounds: dict = {}, padding: float = 2.5) -> plt.axes:
     return ax
 
 
-def map_box(bb: dict, padding=20):
+def map_box(bb: dict, points: List= [], padding=20):
     '''
     Adds bounding box to map
     '''
@@ -112,18 +148,24 @@ def map_box(bb: dict, padding=20):
     poly = Polygon([(bb['min_lon'], bb['min_lat']), (bb['min_lon'], bb['max_lat']), (bb['max_lon'], bb['max_lat']), (bb['max_lon'], bb['min_lat'])],
                    facecolor=(0, 0, 0, 0.0), edgecolor='red', linewidth=2, zorder=200)
     ax.add_patch(poly)
+    for (lat, lon, label) in points:
+        ax.scatter([lon], [lat], s=50, alpha=1, label=label)
+    if points:
+        plt.legend()
     plt.show()
 
 
-def map_points(points: List, region='miss', title='', zoom=False):
+def map_points(points: List, region='', title='', zoom=False):
     '''
     Plots lat lon points on map
     points: list of tuples (lat, lon, label)
     '''
     ax = base_map()
-
     for (lat, lon, label) in points:
-        ax.scatter([lon], [lat], s=50, alpha=1, label=label)
+        if "Fire" in label:
+            ax.scatter([lon], [lat], s=50, marker='*', alpha=1, label=label)
+        else:
+            ax.scatter([lon], [lat], s=50, alpha=1, label=label)
 
     ax.set_title(title)
 
@@ -141,6 +183,15 @@ def map_points(points: List, region='miss', title='', zoom=False):
         if zoom:
             ax.set_xlim(-0.5, 1)
             ax.set_ylim(44, 45)
+    elif region == 'la':
+        ax.set_xlim(-120, -117)
+        ax.set_ylim(32, 35)
+    elif region == 'alberta':
+        ax.set_xlim(-130, -110)
+        ax.set_ylim(40, 65)
+    elif region == 'norcal':
+        ax.set_xlim(-127.5, -115)
+        ax.set_ylim(35, 45)
 
     ax.legend().set_zorder(102)
 
