@@ -194,11 +194,13 @@ def get_insitu_sites(insitu_url: str) -> pd.DataFrame:
     all_sites = []
     for provider in r.json()['providers']:
         provider_name = provider['provider']
-        sites = [proj['sites'] for proj in provider['projects'] if proj['project'] == 'AQACF'][0]
-        for site in sites:
-            site['provider'] = provider_name
-        all_sites.extend(sites)
-    return pd.DataFrame(all_sites)[['provider', 'site', 'lat', 'lon']]
+        for proj in provider['projects']:
+            if proj['project'] != 'AQACF':
+                continue
+            for platform in proj['platforms']:
+                platform['provider'] = provider_name
+                all_sites.append(platform)
+    return pd.DataFrame(all_sites)[['provider', 'platform', 'platform_short_name','lat', 'lon']]
 
 '''
 FireAlarm endpoint response processing
@@ -213,6 +215,8 @@ def prep_insitu(results: List) -> pd.DataFrame:
     df = pd.DataFrame(all_results)
     df = df.dropna(axis=1, how='all')
     df.time = pd.to_datetime(df.time)
+    df = pd.concat([df.drop(['platform'], axis=1), df['platform'].apply(pd.Series)], axis=1)
+    df = df.sort_values(by=['id', 'time'])
     return df
 
 

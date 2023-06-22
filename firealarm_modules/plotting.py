@@ -195,6 +195,9 @@ def map_points(points: List, region='', title='', zoom=False):
     elif region == 'westcoast':
         ax.set_xlim(-130, -100)
         ax.set_ylim(30, 60)
+    elif region == 'newyork':
+        ax.set_xlim(-80, -72)
+        ax.set_ylim(40,45)
 
     ax.legend().set_zorder(102)
 
