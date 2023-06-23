@@ -163,9 +163,9 @@ def map_points(points: List, region='', title='', zoom=False):
     ax = base_map()
     for (lat, lon, label) in points:
         if "Fire" in label:
-            ax.scatter([lon], [lat], s=50, marker='*', alpha=1, label=label)
+            ax.scatter([lon], [lat], s=100, marker='*', alpha=1, label=label)
         else:
-            ax.scatter([lon], [lat], s=50, alpha=1, label=label)
+            ax.scatter([lon], [lat], s=100, alpha=1, label=label)
 
     ax.set_title(title)
 
