@@ -43,6 +43,58 @@ def timeseries_plot(data: List[Tuple[xr.DataArray, str]], x_label: str, y_label:
     plt.show()
 
 
+def timeseries_plot_irregular(
+        data: List[Tuple[xr.DataArray, str]],
+        x_label: str,
+        y_label: str,
+        title='',
+        norm=False,
+        times: List[datetime] = None,
+        max_ticks=12,
+        save_as=None
+):
+    plt.figure(figsize=(12, 5))
+
+    if times:
+        data = [(da.sel(time=times, method='nearest'), l) for da, l in data]
+
+    for entry in data:
+        da = entry[0]
+        label = entry[1]
+        vals = da.values
+
+        x_ticks = [str(dt)[:19] for dt in da.time.to_numpy()]
+
+        if norm:
+            vals = (vals - np.nanmin(vals)) / (np.nanmax(vals) - np.nanmin(vals))
+        if len(entry) == 3:
+            plt.plot(np.arange(len(vals)), vals, linewidth=2,
+                     label=textwrap.fill(label, 50), color=entry[2])
+        else:
+            plt.plot(np.arange(len(vals)), vals, linewidth=2,
+                     label=textwrap.fill(label, 50))
+
+        if max_ticks:
+            s = (len(vals) // max_ticks) + 1
+        else:
+            s = 1
+
+        plt.xticks(np.arange(len(vals))[::s], x_ticks[::s])
+
+    plt.grid(visible=True, which='major', color='k', linestyle='-')
+    plt.xlabel(x_label, fontsize=12)
+    plt.ylabel(y_label, fontsize=12)
+    plt.gcf().autofmt_xdate()
+    plt.xticks(rotation=45)
+    plt.title(title, fontsize=16)
+    plt.legend(prop={'size': 10})
+
+    if save_as:
+        plt.savefig(save_as, facecolor='white')
+    plt.show()
+    # TODO: plot ts data at irregular time intervals but spaced regularly on the plot
+
+
 def timeseries_multi_plot(data: List[Tuple[xr.DataArray, str, str]]):
     
     fig, axs = plt.subplots(int(np.ceil(len(data)/2)), 2,  figsize=(10,8))
@@ -151,7 +203,7 @@ def map_box(bb: dict, points: List= [], padding=20):
     for (lat, lon, label) in points:
         ax.scatter([lon], [lat], s=50, alpha=1, label=label)
     if points:
-        plt.legend()
+        plt.legend(facecolor='white', framealpha=1)
     plt.show()
 
 
@@ -202,7 +254,17 @@ def map_points(points: List, region='', title='', zoom=False):
     ax.legend().set_zorder(102)
 
 
-def map_data(data: xr.DataArray, title: str, cmap='rainbow', cb_label='', log_scale=False, padding=2.5):
+def map_data(
+        data: xr.DataArray,
+        title: str,
+        cmap='rainbow',
+        cb_label='',
+        log_scale=False,
+        padding=2.5,
+        vmin=None,
+        vmax=None,
+        points: List= []
+):
     '''
     Plots data on map
     '''
@@ -214,11 +276,21 @@ def map_data(data: xr.DataArray, title: str, cmap='rainbow', cb_label='', log_sc
     }
     ax = base_map(bounds, padding)
     x, y = np.meshgrid(data.lon, data.lat)
+    if not vmax:
+        vmax = np.nanmax(data.values)
+    if not vmin:
+        vmin = np.nanmin(data.values)
+
     if log_scale:
         mesh = ax.pcolormesh(x, y, data.values, norm=colors.LogNorm(), cmap=cmap, alpha=0.75)
     else:
-        mesh = ax.pcolormesh(x, y, data.values, vmin=np.nanmin(data.values),
-                             vmax=np.nanmax(data.values), cmap=cmap, alpha=0.75)
+        mesh = ax.pcolormesh(x, y, data.values, vmin=vmin,
+                             vmax=vmax, cmap=cmap, alpha=0.75)
+
+    for (lat, lon, label) in points:
+        ax.scatter([lon], [lat], s=50, alpha=1, label=label)
+    if points:
+        plt.legend(facecolor='white', framealpha=1)
     cb = plt.colorbar(mesh)
     cb.set_label(cb_label)
     plt.title(title)
