@@ -92,7 +92,6 @@ def timeseries_plot_irregular(
     if save_as:
         plt.savefig(save_as, facecolor='white')
     plt.show()
-    # TODO: plot ts data at irregular time intervals but spaced regularly on the plot
 
 
 def timeseries_multi_plot(data: List[Tuple[xr.DataArray, str, str]]):
