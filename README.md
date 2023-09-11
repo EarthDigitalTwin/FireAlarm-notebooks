@@ -1,4 +1,4 @@
-The `AirQuality_demo.ipynb` notebook highlights some of the analytics and visualization capabilities of AQACF with six use cases:
+The `AirQuality_demo.ipynb` notebook highlights some of the analytics and visualization capabilities of Fire Alarm: Science Data Platform for Wildfire and Air Quality with six use cases:
 - 2023 Canadian Wildfires Impacting New York Air Quality
 - 2021 Alisal Wildfire
 - 2021 California Wildfires
