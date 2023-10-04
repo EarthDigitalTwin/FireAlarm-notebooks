@@ -275,9 +275,9 @@ def map_data(
     }
     ax = base_map(bounds, padding)
     x, y = np.meshgrid(data.lon, data.lat)
-    if not vmax:
+    if vmax is None:
         vmax = np.nanmax(data.values)
-    if not vmin:
+    if vmin is None:
         vmin = np.nanmin(data.values)
 
     if log_scale:
