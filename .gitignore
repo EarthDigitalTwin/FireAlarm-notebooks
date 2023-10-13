@@ -133,5 +133,4 @@ dmypy.json
 
 # Imagery
 *.png
-!images/*.png
 *.gif
