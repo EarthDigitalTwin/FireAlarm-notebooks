@@ -1,16 +1,20 @@
+import textwrap
+import types
 from datetime import datetime
+from typing import Dict, Literal
 from typing import List, Tuple
-from matplotlib import dates
-import xarray as xr
-import pandas as pd
-import matplotlib.pyplot as plt
-from matplotlib.patches import Polygon
+
 import cartopy.crs as ccrs
 import cartopy.feature as cf
-from cartopy.mpl.gridliner import LATITUDE_FORMATTER, LONGITUDE_FORMATTER
-import numpy as np
-import textwrap
 import matplotlib.colors as colors
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import xarray as xr
+from cartopy.mpl.gridliner import LATITUDE_FORMATTER, LONGITUDE_FORMATTER
+from matplotlib import dates
+from matplotlib.patches import Polygon
+from mpl_toolkits.basemap import Basemap
 
 
 def timeseries_plot(data: List[Tuple[xr.DataArray, str]], x_label: str, y_label: str, title='', norm=False):
@@ -153,6 +157,174 @@ def plot_insitu(data: List[Tuple[pd.DataFrame, str, str]], title: str, ylabel='m
     plt.xticks(rotation=45)
     plt.title(title, fontsize=16)
     plt.legend(prop={'size': 12})
+
+
+def map_with_timeseries_multi(
+        data: List[Tuple[xr.Dataset, str, Dict[str, float], xr.DataArray]],
+        padding=(2.0, 0.5),
+        title='',
+        var: Literal['mean', 'minimum', 'maximum'] = 'mean',
+        cmap='rainbow',
+        vmin=None, vmax=None,
+        cbar_label='',
+        ts_title='Timeseries',
+        ts_xlabel='time',
+        ts_ylabel='value',
+        context_map_title='Map',
+        subset_map_title='Data Subset',
+        quick=False
+):
+    n_rows = len(data)
+    n_cols = 3
+
+    n_subplots = n_rows * n_cols
+
+    pos = range(1, n_subplots + 1)
+
+    fig = plt.figure(
+        1,
+        figsize=(22, 3 * n_rows),
+        constrained_layout=True
+    )
+
+    gs = fig.add_gridspec(n_rows, 5, wspace=0.000)
+
+    for i, d in enumerate(data):
+        # ax1 = fig.add_subplot(n_rows, n_cols, pos[i*3])
+        ax1 = fig.add_subplot(gs[i, 0])
+
+        min_lat = d[2]['min_lat']
+        min_lon = d[2]['min_lon']
+        max_lat = d[2]['max_lat']
+        max_lon = d[2]['max_lon']
+
+        b_lats = [min_lat, max_lat, max_lat, min_lat]
+        b_lons = [min_lon, min_lon, max_lon, max_lon]
+
+        lat_len = max_lat - min_lat
+        lon_len = max_lon - min_lon
+
+        if lat_len >= lon_len:
+            diff = lat_len - lon_len
+
+            min_lon -= (diff / 2)
+            max_lon += (diff / 2)
+        else:
+            diff = lon_len - lat_len
+
+            min_lat -= (diff / 2)
+            max_lat += (diff / 2)
+
+        margin = (max_lon - min_lon) * padding[0]
+
+        m = Basemap(
+            projection='cyl',
+            lon_0=180,
+            llcrnrlat=min_lat - margin,
+            urcrnrlat=max_lat + margin,
+            llcrnrlon=min_lon - margin,
+            urcrnrlon=max_lon + margin,
+            ax=ax1,
+        )
+
+        ax1.set_ylabel(d[1], fontsize='large')
+
+        x, y = m(b_lons, b_lats)
+        xy = zip(x, y)
+
+        poly = Polygon(list(xy), edgecolor='red', facecolor='none')
+        ax1.add_patch(poly)
+
+        m.arcgisimage(server='http://server.arcgisonline.com/ArcGIS',
+                      service='World_Imagery',
+                      xpixels=2000, ypixels=None, dpi=2000, verbose=False)
+
+        # m.drawcoastlines()
+
+        if len(d) == 4:
+            subset_data = d[3][0]
+
+            sub_lats = subset_data.lat
+            sub_lons = subset_data.lon
+
+            min_lat = sub_lats.min().data
+            max_lat = sub_lats.max().data
+            min_lon = sub_lons.min().data
+            max_lon = sub_lons.max().data
+
+            lat_len = max_lat - min_lat
+            lon_len = max_lon - min_lon
+
+            if lat_len >= lon_len:
+                diff = lat_len - lon_len
+
+                min_lon -= (diff / 2)
+                max_lon += (diff / 2)
+            else:
+                diff = lon_len - lat_len
+
+                min_lat -= (diff / 2)
+                max_lat += (diff / 2)
+
+            # ax2 = fig.add_subplot(n_rows, n_cols, pos[(i*3) + 1])
+            ax2 = fig.add_subplot(gs[i, 1])
+
+            margin = (max_lon - min_lon) * padding[1]
+
+            m2 = Basemap(
+                projection='cyl',
+                lon_0=180,
+                llcrnrlat=min_lat - margin,
+                urcrnrlat=max_lat + margin,
+                llcrnrlon=min_lon - margin,
+                urcrnrlon=max_lon + margin,
+                ax=ax2,
+            )
+
+            x, y = m2(subset_data.lon.to_numpy(), subset_data.lat.to_numpy())
+
+            if vmax is None:
+                vmax = np.nanmax(subset_data.values)
+            elif isinstance(vmax, types.FunctionType):
+                vmax = vmax(subset_data)
+            if vmin is None:
+                vmin = np.nanmin(subset_data.values)
+            elif isinstance(vmin, types.FunctionType):
+                vmin = vmin(subset_data)
+
+            cs = m2.pcolormesh(x, y, subset_data.to_numpy(), vmin=vmin, vmax=vmax, cmap=cmap, alpha=0.75)
+            cb = plt.colorbar(cs, ax=ax2, label=cbar_label)
+
+            m2.arcgisimage(server='http://server.arcgisonline.com/ArcGIS',
+                           service='World_Imagery',
+                           xpixels=2000, ypixels=None, dpi=2000, verbose=False)
+
+            # m2.drawcoastlines()
+
+            ax2.set_xlabel(f'Subset plotted from\n{d[3][1].strftime("%Y-%m-%dT%H:%M:%S")}', fontsize='medium')
+
+        if i == 0:
+            ax1.set_title(context_map_title, fontsize='large')
+            ax2.set_title(subset_map_title, fontsize='large')
+
+        # ax3 = fig.add_subplot(n_rows, n_cols, pos[(i*3) + 2])
+        ax3 = fig.add_subplot(gs[i, 2:])
+
+        da = d[0][var]
+        label = d[1]
+        vals = da.values
+
+        ax3.plot(da.time, vals, linewidth=2, label=textwrap.fill(label, 50))
+        ax3.grid(visible=True, which='major', color='k', linestyle='-')
+        if i == 0:
+            ax3.set_title(ts_title, fontsize='large')
+        ax3.set_xlabel(ts_xlabel, fontsize='large')
+        ax3.set_ylabel(ts_ylabel, fontsize='large')
+
+    fig.suptitle(title, fontsize='xx-large')
+
+    plt.savefig('emit.png', facecolor='white')
+    plt.show()
 
 
 def base_map(bounds: dict = {}, padding: float = 2.5) -> plt.axes:

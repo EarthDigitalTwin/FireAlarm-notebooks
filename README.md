@@ -1,4 +1,4 @@
-The `AirQuality_demo.ipynb` notebook highlights some of the analytics and visualization capabilities of Fire Alarm: Science Data Platform for Wildfire and Air Quality  with eight use cases:
+The `AirQuality_demo.ipynb` notebook highlights some of the analytics and visualization capabilities of Fire Alarm: Science Data Platform for Wildfire and Air Quality with the following use cases:
 - 2023 Canadian Wildfires Impacting New York Air Quality
 - 2021 Alisal Wildfire
 - 2021 California Wildfires
@@ -9,6 +9,7 @@ The `AirQuality_demo.ipynb` notebook highlights some of the analytics and visual
 - OCO-3 Snapshot Area Map data:
   - Impact of the COVID-19 pandemic response to CO2 emissions
   - Bełchatów Power Station, Poland: Do observed emissions match reported emissions?
+- EMIT Methane plumes
 
 __Requirements__  
 

@@ -75,7 +75,16 @@ def temporal_variance(base_url: str, dataset: str, bb: dict, start_time: datetim
     return prep_var(var_json)
 
 
-def data_subsetting(base_url: str, dataset: str, bb: dict, start_time: datetime, end_time: datetime, variable_name: str) -> xr.DataArray:
+def data_subsetting(
+        base_url: str,
+        dataset: str,
+        bb: dict,
+        start_time: datetime,
+        end_time: datetime,
+        variable_name: str,
+        vmin: float = None,
+        vmax: float = None
+) -> xr.DataArray:
     '''
     Makes request to datainbounds FireAlarm endpoint
     '''
@@ -90,7 +99,7 @@ def data_subsetting(base_url: str, dataset: str, bb: dict, start_time: datetime,
     start = time.perf_counter()
     var_json = requests.get(url, verify=False).json()
     print("took {} seconds".format(time.perf_counter() - start))
-    return prep_data_in_bounds(var_json, variable_name)
+    return prep_data_in_bounds(var_json, variable_name, vmin=vmin, vmax=vmax)
 
 
 def max_min_map_spark(base_url: str, dataset: str, bb: dict, start_time: datetime, end_time: datetime) -> xr.Dataset:
@@ -260,7 +269,7 @@ def prep_var(var_json: dict) -> xr.DataArray:
     return da
 
 
-def prep_data_in_bounds(var_json: dict, variable_name: str) -> xr.DataArray:
+def prep_data_in_bounds(var_json: dict, variable_name: str, vmin: float = None, vmax: float = None) -> xr.DataArray:
     '''
     Formats datainbounds response into xarray dataarray object
     '''
@@ -284,7 +293,18 @@ def prep_data_in_bounds(var_json: dict, variable_name: str) -> xr.DataArray:
     for i, t in enumerate(times):
         for j, lat in enumerate(lats):
             for k, lon in enumerate(lons):
-                vals_3d[i, j, k] = data_dict.get((t, lat, lon), np.nan)
+                val = data_dict.get((t, lat, lon), np.nan)
+
+                if not np.isnan(val):
+                    if vmin is not None:
+                        if val < vmin:
+                            val = np.nan
+
+                    if vmax is not None:
+                        if val > vmax:
+                            val = np.nan
+
+                vals_3d[i, j, k] = val
 
     da = xr.DataArray(
         data=vals_3d,
