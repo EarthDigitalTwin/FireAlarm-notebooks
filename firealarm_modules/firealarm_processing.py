@@ -1,6 +1,6 @@
 from collections import defaultdict
 from datetime import datetime
-from typing import List
+from typing import List, Callable
 import numpy as np
 import xarray as xr
 import pandas as pd
@@ -83,7 +83,8 @@ def data_subsetting(
         end_time: datetime,
         variable_name: str,
         vmin: float = None,
-        vmax: float = None
+        vmax: float = None,
+        filter_f: Callable = None # Callable
 ) -> xr.DataArray:
     '''
     Makes request to datainbounds FireAlarm endpoint
@@ -99,7 +100,7 @@ def data_subsetting(
     start = time.perf_counter()
     var_json = requests.get(url, verify=False).json()
     print("took {} seconds".format(time.perf_counter() - start))
-    return prep_data_in_bounds(var_json, variable_name, vmin=vmin, vmax=vmax)
+    return prep_data_in_bounds(var_json, variable_name, vmin=vmin, vmax=vmax, filter_f=filter_f)
 
 
 def max_min_map_spark(base_url: str, dataset: str, bb: dict, start_time: datetime, end_time: datetime) -> xr.Dataset:
@@ -269,7 +270,13 @@ def prep_var(var_json: dict) -> xr.DataArray:
     return da
 
 
-def prep_data_in_bounds(var_json: dict, variable_name: str, vmin: float = None, vmax: float = None) -> xr.DataArray:
+def prep_data_in_bounds(
+        var_json: dict,
+        variable_name: str,
+        vmin: float = None,
+        vmax: float = None,
+        filter_f: Callable = None
+) -> xr.DataArray:
     '''
     Formats datainbounds response into xarray dataarray object
     '''
@@ -287,6 +294,9 @@ def prep_data_in_bounds(var_json: dict, variable_name: str, vmin: float = None, 
                 variables[name] = v[name]
 
         return variables
+
+    if filter_f:
+        var_json = [p for p in var_json if filter_f(p)]
 
     data_dict = {(datetime.utcfromtimestamp(data['time']), data['latitude'], data['longitude']): get_variables(data['data'])[variable_name] for data in var_json}
 
