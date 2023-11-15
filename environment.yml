@@ -1,5 +1,5 @@
 # conda env create -f environment.yml
-name: firealarm_notebook
+name: oco3_notebook
 channels:
   - conda-forge
 dependencies:
