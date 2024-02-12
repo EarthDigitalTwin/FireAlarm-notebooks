@@ -286,20 +286,17 @@ def prep_data_in_bounds(
 
     vals_3d = np.full((len(times), len(lats), len(lons)), np.nan)
 
-    def get_variables(data):
-        variables = {}
+    # def get_variables(data):
+    #     variables = {}
         
-        for v in data['variables']:
-            for name in v:
-                variables[name] = v[name]
+    #     for v in data['variables']:
+    #         for name in v:
+    #             variables[name] = v[name]
 
-        return variables
+    #     return variables
 
-    if filter_f:
-        var_json = [p for p in var_json if filter_f(p)]
-
-    data_dict = {(datetime.utcfromtimestamp(data['time']), data['latitude'], data['longitude']): get_variables(data['data'])[variable_name] for data in var_json}
-
+    # data_dict = {(datetime.utcfromtimestamp(data['time']), data['latitude'], data['longitude']): get_variables(data['data'])[variable_name] for data in var_json}
+    data_dict = {(datetime.utcfromtimestamp(data['time']), data['latitude'], data['longitude']): data['data'][0]['variable'] for data in var_json}
     for i, t in enumerate(times):
         for j, lat in enumerate(lats):
             for k, lon in enumerate(lons):
