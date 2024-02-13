@@ -155,7 +155,7 @@ def plot_insitu(data: List[Tuple[pd.DataFrame, str, str]], title: str, ylabel='m
     plt.legend(prop={'size': 12})
 
 
-def base_map(bounds: dict = {}, padding: float = 2.5) -> plt.axes:
+def base_map(bounds: dict = {}, padding: float = 2.5, show_roads=True) -> plt.axes:
     '''
     Creates map with bounds and padding
     '''
@@ -173,12 +173,14 @@ def base_map(bounds: dict = {}, padding: float = 2.5) -> plt.axes:
 
     ax.add_feature(cf.LAND)
     ax.add_feature(cf.OCEAN)
+    ax.add_feature(cf.LAKES, zorder=1)
     ax.coastlines('10m')
     ax.add_feature(cf.STATES, zorder=100)
-    roads = cf.NaturalEarthFeature(category='cultural', 
-        name='roads',
-        scale='10m',facecolor='none')
-    ax.add_feature(roads, alpha=.5)
+    if show_roads:
+        roads = cf.NaturalEarthFeature(category='cultural', 
+            name='roads',
+            scale='10m',facecolor='none')
+        ax.add_feature(roads, alpha=.25) 
 
     gl = ax.gridlines(crs=ccrs.PlateCarree(), linewidth=1, color='black',
                       alpha=0.25, linestyle='--', draw_labels=True, zorder=90)
@@ -206,17 +208,29 @@ def map_box(bb: dict, points: List= [], padding=20):
     plt.show()
 
 
-def map_points(points: List, region='', title='', zoom=False):
+def map_points(points: List, region='', title='', zoom=False, legend=True, roads=True):
     '''
     Plots lat lon points on map
     points: list of tuples (lat, lon, label)
     '''
-    ax = base_map()
-    for (lat, lon, label) in points:
-        if "Fire" in label:
-            ax.scatter([lon], [lat], s=100, marker='*', alpha=1, label=label)
+    ax = base_map(show_roads=roads)
+    if legend:
+        for (lat, lon, label) in points:
+            if region == 'usa':
+                size = 25
+            else:
+                size = 100
+            if "Dixie Fire" in label:
+                ax.scatter([lon], [lat], s=size, marker='*', alpha=1, label=label)
+            else:
+                ax.scatter([lon], [lat], s=size, alpha=1, label=label)
+    else:
+        if region == 'usa':
+            size = 2
         else:
-            ax.scatter([lon], [lat], s=100, alpha=1, label=label)
+            size = 75
+        ax.scatter([p[1] for p in points], [p[0] for p in points], s=size, c='red', zorder=1000)
+            
 
     ax.set_title(title)
 
@@ -249,8 +263,11 @@ def map_points(points: List, region='', title='', zoom=False):
     elif region == 'newyork':
         ax.set_xlim(-80, -72)
         ax.set_ylim(40,45)
-
-    ax.legend().set_zorder(102)
+    elif region == 'usa':
+        ax.set_xlim(-125, -65)
+        ax.set_ylim(23, 52)
+    if legend:
+        ax.legend().set_zorder(102)
 
 
 def map_data(
