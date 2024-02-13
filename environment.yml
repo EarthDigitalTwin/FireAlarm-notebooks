@@ -15,3 +15,4 @@ dependencies:
   - pillow
   - ipykernel
   - basemap
+  - scipy

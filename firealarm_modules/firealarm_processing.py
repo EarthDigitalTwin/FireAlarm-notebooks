@@ -1,11 +1,14 @@
 from collections import defaultdict
 from datetime import datetime
-from typing import List, Callable
+from typing import List, Callable, Union, Tuple
 import numpy as np
 import xarray as xr
 import pandas as pd
 import time
 import requests
+import warnings
+from scipy.interpolate import griddata, NearestNDInterpolator
+import sys
 
 dt_format = "%Y-%m-%dT%H:%M:%SZ"
 
@@ -84,7 +87,8 @@ def data_subsetting(
         variable_name: str,
         vmin: float = None,
         vmax: float = None,
-        filter_f: Callable = None # Callable
+        filter_f: Callable = None, # Callable
+        regrid: Union[float, Tuple[float, float], None] = None
 ) -> xr.DataArray:
     '''
     Makes request to datainbounds FireAlarm endpoint
@@ -100,7 +104,7 @@ def data_subsetting(
     start = time.perf_counter()
     var_json = requests.get(url, verify=False).json()
     print("took {} seconds".format(time.perf_counter() - start))
-    return prep_data_in_bounds(var_json, variable_name, vmin=vmin, vmax=vmax, filter_f=filter_f)
+    return prep_data_in_bounds(var_json, variable_name, vmin=vmin, vmax=vmax, filter_f=filter_f, regrid=regrid)
 
 
 def max_min_map_spark(base_url: str, dataset: str, bb: dict, start_time: datetime, end_time: datetime) -> xr.Dataset:
@@ -275,53 +279,106 @@ def prep_data_in_bounds(
         variable_name: str,
         vmin: float = None,
         vmax: float = None,
-        filter_f: Callable = None
+        filter_f: Callable = None,
+        regrid: Union[float, Tuple[float, float], None] = None
 ) -> xr.DataArray:
     '''
     Formats datainbounds response into xarray dataarray object
     '''
-    lats = np.unique([o['latitude'] for o in var_json])
-    lons = np.unique([o['longitude'] for o in var_json])
-    times = np.unique([datetime.utcfromtimestamp(o['time']) for o in var_json])
 
-    vals_3d = np.full((len(times), len(lats), len(lons)), np.nan)
+    n_ids = len(set([data['data'][0]['id'] for data in var_json]))
 
-    # def get_variables(data):
-    #     variables = {}
-        
-    #     for v in data['variables']:
-    #         for name in v:
-    #             variables[name] = v[name]
+    if n_ids > 1 and regrid is not None:
+        print('Multiple source scenes returned, need to align grids', file=sys.stderr)
 
-    #     return variables
+        if isinstance(regrid, tuple):
+            x_res, y_res = regrid
+        else:
+            x_res, y_res = regrid, regrid
 
-    # data_dict = {(datetime.utcfromtimestamp(data['time']), data['latitude'], data['longitude']): get_variables(data['data'])[variable_name] for data in var_json}
-    data_dict = {(datetime.utcfromtimestamp(data['time']), data['latitude'], data['longitude']): data['data'][0]['variable'] for data in var_json}
-    for i, t in enumerate(times):
-        for j, lat in enumerate(lats):
-            for k, lon in enumerate(lons):
-                val = data_dict.get((t, lat, lon), np.nan)
-
-                if not np.isnan(val):
-                    if vmin is not None:
-                        if val < vmin:
-                            val = np.nan
-
-                    if vmax is not None:
-                        if val > vmax:
-                            val = np.nan
-
-                vals_3d[i, j, k] = val
-
-    da = xr.DataArray(
-        data=vals_3d,
-        dims=['time', 'lat', 'lon'],
-        coords=dict(
-            time=(['time'], times),
-            lat=(['lat'], lats),
-            lon=(['lon'], lons)
+        min_lat, max_lat = tuple(
+            np.unique([o['latitude'] for o in var_json])[[0, -1]]
         )
-    )
+
+        min_lon, max_lon = tuple(
+            np.unique([o['longitude'] for o in var_json])[[0, -1]]
+        )
+
+        times = np.unique([datetime.utcfromtimestamp(o['time']) for o in var_json])
+
+        lons = np.arange(min_lon, max_lon + (x_res / 2), x_res)
+        lats = np.arange(min_lat, max_lat + (y_res / 2), y_res)
+
+        X, Y = np.meshgrid(lons, lats)
+
+        # gridded_data = griddata(
+        #     list(zip([o['longitude'] for o in var_json], [o['latitude'] for o in var_json])),
+        #     np.array([o['data'][0]['variable'] for o in var_json]),
+        #     (X, Y),
+        #     method='nearest',
+        #     fill_value=np.nan
+        # )
+
+        ip = NearestNDInterpolator(
+            np.array(list(zip([o['longitude'] for o in var_json], [o['latitude'] for o in var_json]))),
+            np.array([o['data'][0]['variable'] for o in var_json]),
+            rescale=False
+        )
+
+        gridded_data = ip((X, Y), distance_upper_bound=max(x_res, y_res))
+
+        da = xr.DataArray(
+            data=[gridded_data],
+            dims=['time', 'lat', 'lon'],
+            coords=dict(
+                time=(['time'], [times[0]]),
+                lat=(['lat'], lats),
+                lon=(['lon'], lons)
+            )
+        )
+    else:
+        lats = np.unique([o['latitude'] for o in var_json])
+        lons = np.unique([o['longitude'] for o in var_json])
+        times = np.unique([datetime.utcfromtimestamp(o['time']) for o in var_json])
+
+        vals_3d = np.full((len(times), len(lats), len(lons)), np.nan)
+
+        # def get_variables(data):
+        #     variables = {}
+
+        #     for v in data['variables']:
+        #         for name in v:
+        #             variables[name] = v[name]
+
+        #     return variables
+
+        # data_dict = {(datetime.utcfromtimestamp(data['time']), data['latitude'], data['longitude']): get_variables(data['data'])[variable_name] for data in var_json}
+        data_dict = {(datetime.utcfromtimestamp(data['time']), data['latitude'], data['longitude']): data['data'][0]['variable'] for data in var_json}
+        for i, t in enumerate(times):
+            for j, lat in enumerate(lats):
+                for k, lon in enumerate(lons):
+                    val = data_dict.get((t, lat, lon), np.nan)
+
+                    if not np.isnan(val):
+                        if vmin is not None:
+                            if val < vmin:
+                                val = np.nan
+
+                        if vmax is not None:
+                            if val > vmax:
+                                val = np.nan
+
+                    vals_3d[i, j, k] = val
+
+        da = xr.DataArray(
+            data=vals_3d,
+            dims=['time', 'lat', 'lon'],
+            coords=dict(
+                time=(['time'], times),
+                lat=(['lat'], lats),
+                lon=(['lon'], lons)
+            )
+        )
 
     return da
 
