@@ -173,7 +173,7 @@ def insitu(base_url: str, provider: str, project: str, bb: str, start_time: date
         f'provider={provider}&project={project}&startTime={datetime.strftime(start_time, "%Y-%m-%dT%H:%M:%SZ")}&' \
         f'endTime={datetime.strftime(end_time, "%Y-%m-%dT%H:%M:%SZ")}&bbox={bb}'
 
-    while next_url:
+    while next_url and next_url != 'NA':
         print(next_url)
         res = requests.get(next_url)
         results.append(res.json())
@@ -189,18 +189,19 @@ def get_datasets(base_url: str) -> pd.DataFrame:
     aq_datasets = pd.DataFrame([ds for ds in r.json()['Datasets'] if 'air quality' in ds['Keyword']])
     return aq_datasets
 
-def get_insitu_sites(insitu_url: str) -> pd.DataFrame:
-    r = requests.get(f'{insitu_url}/sub_collection_statistics')
-    all_sites = []
-    for provider in r.json()['providers']:
-        provider_name = provider['provider']
-        for proj in provider['projects']:
-            if proj['project'] != 'AQACF':
-                continue
-            for platform in proj['platforms']:
-                platform['provider'] = provider_name
-                all_sites.append(platform)
-    return pd.DataFrame(all_sites)[['provider', 'platform', 'platform_short_name','lat', 'lon']]
+def get_insitu_collections(insitu_url: str) -> pd.DataFrame:
+    r = requests.get(f'{insitu_url}/query_collection_list')
+    aq_collections = []
+    for collection in r.json():
+        if any(project in collection['project'] for project in ['AQ', 'air_quality']):
+            aq_collections.append(collection)
+    return pd.DataFrame(aq_collections)[['provider', 'project']]
+
+def get_insitu_sites(insitu_url: str, project: str, provider: str) -> pd.DataFrame:
+    params = {'project': project, 'provider': provider}
+    r = requests.get(f'{insitu_url}/sub_collection_statistics', params=params)
+    sites = [site for site in r.json()["providers"][0]["projects"][0]["platforms"]]
+    return pd.DataFrame(sites)[['platform', 'platform_short_name', 'lat', 'lon', 'min_datetime', 'max_datetime']]
 
 '''
 FireAlarm endpoint response processing
