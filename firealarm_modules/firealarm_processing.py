@@ -1,13 +1,18 @@
 from collections import defaultdict
 from datetime import datetime
+import os
 from typing import List
 import numpy as np
 import xarray as xr
 import pandas as pd
 import time
 import requests
+from requests.compat import urlencode
 
-dt_format = "%Y-%m-%dT%H:%M:%SZ"
+DT_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
+BASE_URL = 'https://ideas-digitaltwin.jpl.nasa.gov'
+NEXUS_URL = os.path.join(BASE_URL, 'nexus')
+INSITU_URL = os.path.join(BASE_URL, 'insitu', '1.0')
 
 '''
 FireAlarm endpoint functions
@@ -20,18 +25,29 @@ def firealarm_request(url):
     except:
         raise Exception(f'Error processing request. Check parameters.')
     results = r.json()
-    if 'data' in results:
+    if 'data' in results or 'data' in results[0]:
         return results
     else:
         raise Exception('No data found for request.')
 
-def spatial_timeseries(base_url: str, dataset: str, bb: dict, start_time: datetime, end_time: datetime) -> xr.Dataset:
+def spatial_timeseries(dataset: str, bb: dict, start_time: datetime, end_time: datetime) -> xr.Dataset:
     '''
     Makes request to timeSeriesSpark FireAlarm endpoint
     '''
-    url = '{}/timeSeriesSpark?ds={}&minLon={}&minLat={}&maxLon={}&maxLat={}&startTime={}&endTime={}&lowPassFilter=False'.\
-        format(base_url, dataset, bb['min_lon'], bb['min_lat'], bb['max_lon'], bb['max_lat'],
-               start_time.strftime(dt_format), end_time.strftime(dt_format))
+    algo_url = os.path.join(NEXUS_URL, 'timeSeriesSpark')
+    
+    params = {
+        'ds': dataset,
+        'minLon': bb['min_lon'],
+        'minLat': bb['min_lat'],
+        'maxLon': bb['max_lon'],
+        'maxLat': bb['max_lat'],
+        'startTime': start_time.strftime(DT_FORMAT),
+        'endTime': end_time.strftime(DT_FORMAT),
+        'lowPassFilter': False
+    }
+    
+    url = f'{algo_url}?{urlencode(params)}'
 
     # Display some information about the job
     print(url)
@@ -40,28 +56,28 @@ def spatial_timeseries(base_url: str, dataset: str, bb: dict, start_time: dateti
     # Query FireAlarm to compute the time averaged map
     print("Waiting for response from FireAlarm...", end="")
     start = time.perf_counter()
-    ts_json = firealarm_request(url)
-    print("took {} seconds".format(time.perf_counter() - start))
-    return prep_ts(ts_json)
+    resp_json = firealarm_request(url)
+    print(f"took {time.perf_counter() - start} seconds")
+    return prep_ts(resp_json)
 
 
-def temporal_variance(base_url: str, dataset: str, bb: dict, start_time: datetime, end_time: datetime) -> xr.DataArray:
+def temporal_variance(dataset: str, bb: dict, start_time: datetime, end_time: datetime) -> xr.DataArray:
     '''
     Makes request to varianceSpark FireAlarm endpoint
     '''
+    algo_url = os.path.join(NEXUS_URL, 'varianceSpark')
+    
     params = {
         'ds': dataset,
         'minLon': bb['min_lon'],
         'minLat': bb['min_lat'],
         'maxLon': bb['max_lon'],
         'maxLat': bb['max_lat'],
-        'startTime': start_time.strftime(dt_format),
-        'endTime': end_time.strftime(dt_format)
+        'startTime': start_time.strftime(DT_FORMAT),
+        'endTime': end_time.strftime(DT_FORMAT)
     }
-
-    url = '{}/varianceSpark?ds={}&minLon={}&minLat={}&maxLon={}&maxLat={}&startTime={}&endTime={}'.\
-        format(base_url, dataset, bb['min_lon'], bb['min_lat'], bb['max_lon'], bb['max_lat'],
-               start_time.strftime(dt_format), end_time.strftime(dt_format))
+    
+    url = f'{algo_url}?{urlencode(params)}'
 
     # Display some information about the job
     print('url\n', url)
@@ -70,106 +86,143 @@ def temporal_variance(base_url: str, dataset: str, bb: dict, start_time: datetim
     # Query FireAlarm to compute the time averaged map
     print("Waiting for response from FireAlarm... ", end="")
     start = time.perf_counter()
-    var_json = requests.get(url, params=params, verify=False).json()
-    print("took {} seconds".format(time.perf_counter() - start))
-    return prep_var(var_json)
+    resp_json = firealarm_request(url)
+    print(f"took {time.perf_counter() - start} seconds")
+    return prep_var(resp_json)
 
 
-def data_subsetting(base_url: str, dataset: str, bb: dict, start_time: datetime, end_time: datetime, variable_name: str) -> xr.DataArray:
+def data_subsetting(dataset: str, bb: dict, start_time: datetime, end_time: datetime, variable_name: str) -> xr.DataArray:
     '''
     Makes request to datainbounds FireAlarm endpoint
     '''
-    url = '{}/datainbounds?ds={}&b={},{},{},{}&startTime={}&endTime={}&lowPassFilter=False'.format(
-        base_url, dataset, bb['min_lon'], bb['min_lat'], bb['max_lon'], bb['max_lat'],
-        start_time.strftime(dt_format), end_time.strftime(dt_format))
+    algo_url = os.path.join(NEXUS_URL, 'datainbounds')
+    
+    params = {
+        'ds': dataset,
+        'b': f'{bb["min_lon"]},{bb["min_lat"]},{bb["max_lon"]},{bb["max_lat"]}',
+        'startTime': start_time.strftime(DT_FORMAT),
+        'endTime': end_time.strftime(DT_FORMAT),
+    }
+    
+    url = f'{algo_url}?{urlencode(params)}'
 
     print(url)
     print()
 
     print("Waiting for response from FireAlarm...", end="")
     start = time.perf_counter()
-    var_json = requests.get(url, verify=False).json()
-    print("took {} seconds".format(time.perf_counter() - start))
-    return prep_data_in_bounds(var_json, variable_name)
+    resp_json = firealarm_request(url)
+    print(f"took {time.perf_counter() - start} seconds")
+    return prep_data_in_bounds(resp_json, variable_name)
 
 
-def max_min_map_spark(base_url: str, dataset: str, bb: dict, start_time: datetime, end_time: datetime) -> xr.Dataset:
+def max_min_map_spark(dataset: str, bb: dict, start_time: datetime, end_time: datetime) -> xr.Dataset:
     '''
     Makes request to maxMinMapSpark endpoint
     '''
-    url = f'{base_url}/maxMinMapSpark?ds={dataset}&' \
-          f'b={bb["min_lon"]},{bb["min_lat"]},{bb["max_lon"]},{bb["max_lat"]}&' \
-          f'startTime={start_time.strftime(dt_format)}&endTime={end_time.strftime(dt_format)}'
+    algo_url = os.path.join(NEXUS_URL, 'maxMinMapSpark')
+    
+    params = {
+        'ds': dataset,
+        'minLon': bb['min_lon'],
+        'minLat': bb['min_lat'],
+        'maxLon': bb['max_lon'],
+        'maxLat': bb['max_lat'],
+        'startTime': start_time.strftime(DT_FORMAT),
+        'endTime': end_time.strftime(DT_FORMAT)
+    }
+    
+    url = f'{algo_url}?{urlencode(params)}'
 
     print(url)
     print()
 
     print("Waiting for response from FireAlarm... ", end="")
     start = time.perf_counter()
-    resp = requests.get(url, verify=False).json()
+    resp_json = firealarm_request(url)
     print("took {} seconds".format(time.perf_counter() - start))
-    return max_min_prep(resp)
+    return max_min_prep(resp_json)
 
 
-def daily_diff(base_url: str, dataset: str, clim: str, bb: dict, start_time: datetime, end_time: datetime) -> xr.Dataset:
+def daily_diff(dataset: str, clim: str, bb: dict, start_time: datetime, end_time: datetime) -> xr.Dataset:
     '''
     Makes request to dailydifferenceaverage_spark endpoint
     '''
-    url = f'{base_url}/dailydifferenceaverage_spark?dataset={dataset}&' \
-          f'climatology={clim}&' \
-          f'b={bb["min_lon"]},{bb["min_lat"]},{bb["max_lon"]},{bb["max_lat"]}&' \
-          f'startTime={start_time.strftime(dt_format)}&endTime={end_time.strftime(dt_format)}'
+    algo_url = os.path.join(NEXUS_URL, 'dailydifferenceaverage_spark')
+    
+    params = {
+        'dataset': dataset,
+        'climatology': clim,
+        'b': f'{bb["min_lon"]},{bb["min_lat"]},{bb["max_lon"]},{bb["max_lat"]}',
+        'startTime': start_time.strftime(DT_FORMAT),
+        'endTime': end_time.strftime(DT_FORMAT),
+    }
+    
+    url = f'{algo_url}?{urlencode(params)}'
 
     print(url)
     print()
 
     print("Waiting for response from FireAlarm... ", end="")
     start = time.perf_counter()
-    resp = requests.get(url, verify=False).json()
-    print("took {} seconds".format(time.perf_counter() - start))
-    return daily_diff_prep(resp)
+    resp_json = firealarm_request(url)
+    print(f"took {time.perf_counter() - start} seconds")
+    return daily_diff_prep(resp_json)
 
 
-def temporal_mean(base_url: str, dataset: str, bb: dict, start_time: datetime, end_time: datetime) -> xr.DataArray:
+def temporal_mean(dataset: str, bb: dict, start_time: datetime, end_time: datetime) -> xr.DataArray:
     '''
     Makes request to timeAvgMapSpark endpoint
     '''
-    url = f'{base_url}/timeAvgMapSpark?ds={dataset}&' \
-          f'b={bb["min_lon"]},{bb["min_lat"]},{bb["max_lon"]},{bb["max_lat"]}&' \
-          f'startTime={start_time.strftime(dt_format)}&endTime={end_time.strftime(dt_format)}'
-
+    algo_url = os.path.join(NEXUS_URL, 'timeAvgMapSpark')
+    
+    params = {
+        'ds': dataset,
+        'b': f'{bb["min_lon"]},{bb["min_lat"]},{bb["max_lon"]},{bb["max_lat"]}',
+        'startTime': start_time.strftime(DT_FORMAT),
+        'endTime': end_time.strftime(DT_FORMAT),
+    }
+    
+    url = f'{algo_url}?{urlencode(params)}'
+    
     print(url)
     print()
 
     print("Waiting for response from FireAlarm... ", end="")
     start = time.perf_counter()
-    resp = requests.get(url, verify=False).json()
-    print("took {} seconds".format(time.perf_counter() - start))
-    return temporal_mean_prep(resp)
+    resp_json = firealarm_request(url)
+    print(f"took {time.perf_counter() - start} seconds")
+    return temporal_mean_prep(resp_json)
 
 
-def hofmoeller(base_url: str, dataset: str, bb: dict, start_time: datetime, end_time: datetime, dim: str = 'latitude') -> xr.Dataset:
+def hofmoeller(dataset: str, bb: dict, start_time: datetime, end_time: datetime, dim: str = 'latitude') -> xr.Dataset:
     '''
     Makes request to either latitudeTimeHofMoellerSpark or longitudeTimeHofMoellerSpark endpoint
     '''
-    url = f'{base_url}/{dim}TimeHofMoellerSpark?ds={dataset}&' \
-          f'b={bb["min_lon"]},{bb["min_lat"]},{bb["max_lon"]},{bb["max_lat"]}&' \
-          f'startTime={start_time.strftime(dt_format)}&endTime={end_time.strftime(dt_format)}'
-
+    algo_url = os.path.join(NEXUS_URL, f'{dim}TimeHofMoellerSpark')
+    
+    params = {
+        'ds': dataset,
+        'b': f'{bb["min_lon"]},{bb["min_lat"]},{bb["max_lon"]},{bb["max_lat"]}',
+        'startTime': start_time.strftime(DT_FORMAT),
+        'endTime': end_time.strftime(DT_FORMAT),
+    }
+    
+    url = f'{algo_url}?{urlencode(params)}'
+    
     print(url)
     print()
 
     print("Waiting for response from FireAlarm... ", end="")
     start = time.perf_counter()
-    resp = requests.get(url, verify=False).json()
-    print("took {} seconds".format(time.perf_counter() - start))
-    return hofmoeller_prep(resp, dim)
+    resp_json = firealarm_request(url)
+    print(f"took {time.perf_counter() - start} seconds")
+    return hofmoeller_prep(resp_json, dim)
 
 
-def insitu(base_url: str, provider: str, project: str, bb: str, start_time: datetime, end_time: datetime) -> pd.DataFrame:
+def insitu(provider: str, project: str, bb: str, start_time: datetime, end_time: datetime) -> pd.DataFrame:
     results = []
-    base_url = base_url.replace('/nexus', '')
-    next_url = f'{base_url}/insitu/1.0/query_data_doms_custom_pagination?startIndex=0&itemsPerPage=10000&' \
+    next_url = f'{INSITU_URL}/query_data_doms_custom_pagination?startIndex=0&itemsPerPage=10000&' \
         f'provider={provider}&project={project}&startTime={datetime.strftime(start_time, "%Y-%m-%dT%H:%M:%SZ")}&' \
         f'endTime={datetime.strftime(end_time, "%Y-%m-%dT%H:%M:%SZ")}&bbox={bb}'
 
@@ -184,22 +237,34 @@ def insitu(base_url: str, provider: str, project: str, bb: str, start_time: date
     return prep_insitu(results)
 
 
-def get_datasets(base_url: str) -> pd.DataFrame:
-    r = requests.get(f'{base_url}/edge/ws/dat/dataset?inDAT=true&itemsPerPage=100')
+def get_datasets() -> pd.DataFrame:
+    r = requests.get(f'{BASE_URL}/edge/ws/dat/dataset?inDAT=true&itemsPerPage=100')
     aq_datasets = pd.DataFrame([ds for ds in r.json()['Datasets'] if 'air quality' in ds['Keyword']])
     return aq_datasets
 
-def get_insitu_collections(insitu_url: str) -> pd.DataFrame:
-    r = requests.get(f'{insitu_url}/query_collection_list')
+def get_date_coverage(collection: str) -> tuple[datetime, datetime]:
+    r = requests.get(os.path.join(NEXUS_URL, 'list'))
+    collections = r.json()
+    df = pd.DataFrame(collections)
+    collection_meta = df[df['shortName'] == collection]
+    if collection_meta.shape[0] != 1:
+        print(f'Collection {collection} not found')
+        return
+    start_date = pd.to_datetime(collection_meta['iso_start']).iloc[0].date()
+    end_date = pd.to_datetime(collection_meta['iso_end']).iloc[0].date()
+    return start_date, end_date
+
+def get_insitu_collections() -> pd.DataFrame:
+    r = requests.get(f'{INSITU_URL}/query_collection_list')
     aq_collections = []
     for collection in r.json():
         if any(project in collection['project'] for project in ['AQ', 'air_quality']):
             aq_collections.append(collection)
     return pd.DataFrame(aq_collections)[['provider', 'project']]
 
-def get_insitu_sites(insitu_url: str, project: str, provider: str) -> pd.DataFrame:
+def get_insitu_sites(project: str, provider: str) -> pd.DataFrame:
     params = {'project': project, 'provider': provider}
-    r = requests.get(f'{insitu_url}/sub_collection_statistics', params=params)
+    r = requests.get(f'{INSITU_URL}/sub_collection_statistics', params=params)
     sites = [site for site in r.json()["providers"][0]["projects"][0]["platforms"]]
     return pd.DataFrame(sites)[['platform', 'platform_short_name', 'lat', 'lon', 'min_datetime', 'max_datetime']]
 
