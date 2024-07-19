@@ -91,7 +91,7 @@ def temporal_variance(dataset: str, bb: dict, start_time: datetime, end_time: da
     return prep_var(resp_json)
 
 
-def data_subsetting(dataset: str, bb: dict, start_time: datetime, end_time: datetime, variable_name: str) -> xr.DataArray:
+def data_subsetting(dataset: str, bb: dict, start_time: datetime, end_time: datetime, variable_name: str | None = None) -> xr.DataArray:
     '''
     Makes request to datainbounds FireAlarm endpoint
     '''
@@ -326,7 +326,7 @@ def prep_var(var_json: dict) -> xr.DataArray:
     return da
 
 
-def prep_data_in_bounds(var_json: dict, variable_name: str) -> xr.DataArray:
+def prep_data_in_bounds(var_json: dict, variable_name: str | None) -> xr.DataArray:
     '''
     Formats datainbounds response into xarray dataarray object
     '''
@@ -336,17 +336,25 @@ def prep_data_in_bounds(var_json: dict, variable_name: str) -> xr.DataArray:
 
     vals_3d = np.full((len(times), len(lats), len(lons)), np.nan)
 
-    # def get_variables(data):
-    #     variables = {}
-        
-    #     for v in data['variables']:
-    #         for name in v:
-    #             variables[name] = v[name]
+    def extract_variable(data, variable_name):
+        if variable_name is None:
+            first: dict = data[0]
+            return list(first.values())[0]
 
-    #     return variables
+        variables = {}
 
-    # data_dict = {(datetime.utcfromtimestamp(data['time']), data['latitude'], data['longitude']): get_variables(data['data'])[variable_name] for data in var_json}
-    data_dict = {(datetime.utcfromtimestamp(data['time']), data['latitude'], data['longitude']): data['data'][0]['variable'] for data in var_json}
+        for v in data:
+            for name in v:
+                variables[name] = v[name]
+
+        return variables.get(variable_name, np.nan)
+
+    if len(var_json) > 0 and isinstance(var_json[0]['data'], dict):
+        # Detect new DiB output structure and use that
+        data_dict = {(datetime.utcfromtimestamp(data['time']), data['latitude'], data['longitude']): extract_variable(data['data']['variables'], variable_name) for data in var_json}
+    else:
+        data_dict = {(datetime.utcfromtimestamp(data['time']), data['latitude'], data['longitude']): data['data'][0]['variable'] for data in var_json}
+
     for i, t in enumerate(times):
         for j, lat in enumerate(lats):
             for k, lon in enumerate(lons):
