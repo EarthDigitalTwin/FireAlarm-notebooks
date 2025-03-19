@@ -193,17 +193,41 @@ def base_map(bounds: dict = {}, padding: float = 2.5, show_roads=True) -> plt.ax
     return ax
 
 
-def map_box(bb: dict, points: List= [], padding=20):
+def map_box(bbs: List[dict], points: List= [], padding=20):
     '''
     Adds bounding box to map
     '''
-    ax = base_map(bb, padding)
-    poly = Polygon([(bb['min_lon'], bb['min_lat']), (bb['min_lon'], bb['max_lat']), (bb['max_lon'], bb['max_lat']), (bb['max_lon'], bb['min_lat'])],
-                   facecolor=(0, 0, 0, 0.0), edgecolor='red', linewidth=2, zorder=200)
-    ax.add_patch(poly)
+    if isinstance(bbs, dict):
+        bbs = [bbs]
+    
+    if isinstance(bbs[0], tuple):
+        ax = base_map(bbs[0][0], padding)
+    else:    
+        ax = base_map(bbs[0], padding)
+    
+    show_legend = False
+    
+    colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
+    for i, bb in enumerate(bbs):
+        if isinstance(bb, tuple):
+            box_dims = bb[0]
+            box_label = bb[1]
+        else:
+            box_dims = bb
+            box_label = ""
+        
+        if box_label:
+            show_legend = True
+            
+        poly = Polygon([(box_dims['min_lon'], box_dims['min_lat']), 
+                        (box_dims['min_lon'], box_dims['max_lat']), 
+                        (box_dims['max_lon'], box_dims['max_lat']), 
+                        (box_dims['max_lon'], box_dims['min_lat'])],
+                    facecolor=(0, 0, 0, 0.0), edgecolor=colors[i%len(colors)], linewidth=2, zorder=200, label=box_label)
+        ax.add_patch(poly)
     for (lat, lon, label) in points:
         ax.scatter([lon], [lat], s=50, alpha=1, label=label)
-    if points:
+    if points or show_legend:
         plt.legend(facecolor='white', framealpha=1)
     plt.show()
 
@@ -251,6 +275,9 @@ def map_points(points: List, region='', title='', zoom=False, legend=True, roads
     elif region == 'la':
         ax.set_xlim(-120, -117)
         ax.set_ylim(32, 35)
+    elif region == 'eaton':
+        ax.set_xlim(-118.75, -117.75)
+        ax.set_ylim(33.5, 34.5)
     elif region == 'alberta':
         ax.set_xlim(-130, -110)
         ax.set_ylim(40, 65)
@@ -292,6 +319,7 @@ def map_data(
     }
     ax = base_map(bounds, padding)
     x, y = np.meshgrid(data.lon, data.lat)
+
     if vmax is None:
         vmax = np.nanmax(data.values)
     if vmin is None:
