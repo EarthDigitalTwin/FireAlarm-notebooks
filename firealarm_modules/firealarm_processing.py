@@ -235,7 +235,7 @@ def insitu(provider: str, project: str, bb: str, start_time: datetime, end_time:
         else:
             break
     if not results:
-        return "No data found for this query"
+        raise ValueError("No data found for this query")
     return prep_insitu(results)
 
 
