@@ -234,6 +234,8 @@ def insitu(provider: str, project: str, bb: str, start_time: datetime, end_time:
             next_url = res.json()['next']
         else:
             break
+    if not results:
+        return "No data found for this query"
     return prep_insitu(results)
 
 
