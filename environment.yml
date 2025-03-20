@@ -2,6 +2,7 @@
 name: firealarm_notebook
 channels:
   - conda-forge
+  - nodefaults
 dependencies:
   - python=3.10.6
   - xarray
