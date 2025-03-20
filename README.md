@@ -1,7 +1,7 @@
 
 
 The `AirQuality_demo.ipynb` notebook highlights some of the analytics and visualization capabilities of Fire Alarm: Science Data Platform for Wildfire and Air Quality  with eight use cases:
-- [2025 Eaton and Palisades Fires Impacting Southern California](1. 2025 Eaton and Palisades Fires.ipynb)
+- [2025 Eaton and Palisades Fires Impacting Southern California](1.%202025%20Eaton%20and%20Palisades%20Fires.ipynb)
 - 2023 Canadian Wildfires Impacting New York Air Quality
 - 2021 Alisal Wildfire
 - 2021 California Wildfires
