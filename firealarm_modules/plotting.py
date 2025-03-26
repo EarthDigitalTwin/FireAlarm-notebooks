@@ -152,7 +152,7 @@ def plot_insitu(data: List[Tuple[pd.DataFrame, str, str]], title: str, ylabel='m
     plt.gcf().autofmt_xdate()
     plt.xticks(rotation=45)
     plt.title(title, fontsize=16)
-    plt.legend(prop={'size': 12})
+    plt.legend()
 
 
 def base_map(bounds: dict = {}, padding: float = 2.5, show_roads=True) -> plt.axes:
@@ -410,3 +410,47 @@ def stacked_overlay_plot(x_datas: List[np.array], y_datas: List[np.array],
     ax[1].grid(b=True, which='major', color='k', linestyle='--', linewidth=0.25)
 
     plt.show()
+
+
+'''
+Use case specific plotting functions
+'''
+
+def plot_la_fires_pm25_insitu(data: List[Tuple[pd.DataFrame, str, str]], title: str, ylabel='m3/s'):
+    
+    alpha = 0.3
+    
+    fig = plt.figure(figsize=(12, 5))
+    
+    # Setting hazard thresholds as background colors
+    plt.axhspan(0, 9, facecolor='lime', alpha=alpha)
+    plt.text(np.datetime64("2025-01-02T01:00:00"), 0, 'Good', fontsize=8, weight='bold')
+    
+    plt.axhspan(9, 35.5, facecolor='yellow', alpha=alpha)
+    plt.text(np.datetime64("2025-01-02T01:00:00"), 16, 'Moderate', fontsize=8, weight='bold')
+    
+    plt.axhspan(35.5, 55.5, facecolor='orange', alpha=alpha)
+    plt.text(np.datetime64("2025-01-02T01:00:00"), 39, 'Unhealthy for Sensitive Groups', fontsize=8, weight='bold')
+    
+    plt.axhspan(55.5, 125.5, facecolor='red', alpha=alpha)
+    plt.text(np.datetime64("2025-01-02T01:00:00"), 78, 'Unhealthy', fontsize=8, weight='bold')
+    
+    plt.axhspan(125.5, 225.5, facecolor='purple', alpha=alpha)
+    plt.text(np.datetime64("2025-01-02T01:00:00"), 170, 'Very Unhealthy', fontsize=8, weight='bold')
+    
+    plt.axhspan(225.5, 525, facecolor='darkred', alpha=alpha)
+    plt.text(np.datetime64("2025-01-02T01:00:00"), 350, 'Hazardous', fontsize=8, weight='bold')
+    
+
+    for df, var, label in data:
+        plt.plot(df.time, df[var], label=label)
+
+    plt.grid(visible=True, which='major', color='k', linestyle='-')
+    plt.ylabel(ylabel, fontsize=12)
+        
+    plt.gcf().autofmt_xdate()
+    plt.xticks(rotation=45)
+    plt.title(title, fontsize=16)
+    plt.legend()
+    plt.xlim(np.datetime64("2025-01-02"))
+    plt.ylim(-10, 525)
