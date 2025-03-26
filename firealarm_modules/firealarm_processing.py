@@ -1,7 +1,7 @@
 from collections import defaultdict
 from datetime import datetime
 import os
-from typing import List
+from typing import List, Optional
 import numpy as np
 import xarray as xr
 import pandas as pd
@@ -220,11 +220,14 @@ def hofmoeller(dataset: str, bb: dict, start_time: datetime, end_time: datetime,
     return hofmoeller_prep(resp_json, dim)
 
 
-def insitu(provider: str, project: str, bb: str, start_time: datetime, end_time: datetime) -> pd.DataFrame:
+def insitu(provider: str, project: str, bb: str, start_time: datetime, end_time: datetime, platform: Optional[str]=None) -> pd.DataFrame:
     results = []
     next_url = f'{INSITU_URL}/query_data_doms_custom_pagination?startIndex=0&itemsPerPage=10000&' \
         f'provider={provider}&project={project}&startTime={datetime.strftime(start_time, "%Y-%m-%dT%H:%M:%SZ")}&' \
         f'endTime={datetime.strftime(end_time, "%Y-%m-%dT%H:%M:%SZ")}&bbox={bb}'
+        
+    if platform:
+        next_url = (f"{next_url}&platform={platform}")
 
     while next_url and next_url != 'NA':
         print(next_url)
