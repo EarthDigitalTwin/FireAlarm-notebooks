@@ -3,6 +3,10 @@
 The notebooks in this repo highlight some of the analytics and visualization capabilities of the Fire Alarm: 
 Science Data Platform for Wildfire and Air Quality system with the following example use cases:
 
+- [SARP Tutorial](SARP_tutorial) (directory containing all materials for the SARP tutorial):
+  - [README](SARP_tutorial/README.md)
+  - [SARP Demo notebook](SARP_tutorial/SARP_demo.ipynb)
+  - [SARP Tutorial notebook](SARP_tutorial/SARP_tutorial.ipynb)
 - [2025 Eaton and Palisades Fires Impacting Southern California](1.%202025%20Eaton%20and%20Palisades%20Fires.ipynb)
 - [2023 Canadian Wildfires Impacting New York Air Quality](2.%202023%20Canada%20Wildfires.ipynb)
 - [2021 Dixie Wildfire](3.%20Dixie%20Fire.ipynb)
