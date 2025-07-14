@@ -1,0 +1,13 @@
+pandas
+numpy
+requests
+seaborn
+scipy
+scikit-learn
+matplotlib
+folium
+branca
+ipython
+pillow
+notebook
+statsmodels
